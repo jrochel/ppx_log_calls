@@ -1,0 +1,5 @@
+(test
+ (name basic)
+ (preprocess (pps ppx_deriving.show ppx_log_calls))
+ (libraries ppx_deriving ppx_log_calls.runtime)
+ (flags -dsource))

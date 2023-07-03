@@ -1,0 +1,8 @@
+(library
+ (name ppx_log_calls)
+ (public_name ppx_log_calls.ppx)
+ (kind ppx_rewriter)
+ (instrumentation.backend (ppx ppx_log_calls))
+ (synopsis "Ppx deriver for logging function calls for debugging purposes")
+ (flags -w @A-4-7-48-70)
+ (libraries ppxlib))

@@ -1,0 +1,7 @@
+(library
+ (name log_calls)
+ (public_name ppx_log_calls.runtime)
+ (synopsis "Runtime library for ppx-generated code")
+ (modules log_calls)
+ (flags -w @A-4-7-48-70)
+ (wrapped false))
