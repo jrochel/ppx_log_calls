@@ -2,6 +2,7 @@
     To be ignored by the average user of this library. *)
 module type PpxLogCallsAux = sig
   val log : (Format.formatter -> unit) -> unit
+  val log_cut_flush : (Format.formatter -> unit) -> unit
   val const : string -> Format.formatter -> 'a -> unit
   val unsupported : string -> Format.formatter -> 'a -> unit
   val pp_open_box : Format.formatter -> unit
@@ -101,6 +102,7 @@ module type S = sig
 
   (** Below are some pretty-printing functions for standard types *)
 
+  val pp_unit : Format.formatter -> unit -> unit
   val pp_bool : Format.formatter -> bool -> unit
   val pp_int : Format.formatter -> int -> unit
   val pp_float : Format.formatter -> float -> unit

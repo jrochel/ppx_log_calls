@@ -5,6 +5,7 @@ module Constants = struct
   let pp = "pp"
   let pp_pbox = "PpxLogCallsAux.pp_pbox"
   let pp_tuple n = "PpxLogCallsAux.pp_tuple" ^ string_of_int n
+  let pp_char = "Stdlib.Format.pp_print_char"
   let pp_string = "Stdlib.Format.pp_print_string"
   let pp_space = "Stdlib.Format.pp_print_space"
   let pp_cut = "Stdlib.Format.pp_print_cut"
@@ -13,7 +14,7 @@ module Constants = struct
   let pp_close_box = "PpxLogCallsAux.pp_close_box"
   let const = "PpxLogCallsAux.const"
   let todo = "PpxLogCallsAux.unsupported"
-  let log = "PpxLogCallsAux.log"
+  let log_cut_flush = "PpxLogCallsAux.log_cut_flush"
   let fmt = "fmt"
 end
 
@@ -21,6 +22,7 @@ module Builder (Loc : Ast_builder.Loc) = struct
   include Ast_builder.Make (struct let loc = Loc.loc end)
 
   let fmt = evar Constants.fmt
+  let pp_char char = eapply (evar Constants.pp_char) [fmt; echar char]
   let pp_string str = eapply (evar Constants.pp_string) [fmt; estring str]
   let pp_space = eapply (evar Constants.pp_space) [fmt; eunit]
   let pp_open_box = eapply (evar Constants.pp_open_box) [fmt]
@@ -28,6 +30,7 @@ module Builder (Loc : Ast_builder.Loc) = struct
   let pp_pbox pp = eapply (evar Constants.pp_pbox) [pp]
   let pp_cut = eapply (evar Constants.pp_cut) [fmt; eunit]
   let pp_flush = eapply (evar Constants.pp_flush) [fmt; eunit]
+  let log_cut_flush pp = eapply (evar Constants.log_cut_flush) [pp]
 end
 
 exception Unsupported of string loc
@@ -92,36 +95,43 @@ let pp_param
   let open Builder (struct let loc = loc end) in
   let p_label label e =
     match label with
-    | Nolabel -> e
-    | Labelled l ->
-      esequence [pp_string @@ "~" ^ l ^ ":"; pp_open_box; e; pp_close_box]
-    | Optional l ->
-      esequence [pp_string @@ "?" ^ l ^ ":"; pp_open_box; e; pp_close_box]
+    | Nolabel -> [e]
+    | Labelled l -> [pp_string @@ "~" ^ l ^ ":"; pp_open_box; e; pp_close_box]
+    | Optional l -> [pp_string @@ "?" ^ l ^ ":"; pp_open_box; e; pp_close_box]
   in
   let pp_var_by_typ_o = function
     | None -> pp_string "_"
     | Some pt -> eapply (pp_var_by_typ ~loc pt) [fmt; evar param_name]
   in
-  esequence
-    [ pp_space;
-      pp_open_box;
-      p_label param_label (pp_var_by_typ_o param_type);
-      pp_close_box ]
-
-let print_call ~loc params fname =
-  let open Builder (struct let loc = loc end) in
-  let seq =
-    [pp_string fname; esequence (List.rev_map pp_param params); pp_cut; pp_flush]
-  in
-  let log pp =
-    eapply (evar Constants.log)
-      [eabstract [ppat_var {txt = Constants.fmt; loc}] pp]
-  in
-  value_binding ~pat:punit ~expr:(log @@ esequence seq)
+  [pp_space; pp_open_box]
+  @ p_label param_label (pp_var_by_typ_o param_type)
+  @ [pp_close_box]
 
 let transform_binding ~traversal ~loc vb =
+  let open Builder (struct let loc = loc end) in
   (* recurse through lambdas accumulating typed parameters in [params] *)
-  let rec add_print ~loc fname params = function
+  let print_call params fname =
+    eabstract [ppat_var {txt = Constants.fmt; loc}]
+    @@ esequence (pp_string fname :: List.flatten (List.rev_map pp_param params))
+  in
+  let print_result ~res ~typ =
+    eabstract [ppat_var {txt = Constants.fmt; loc}]
+    @@ esequence
+         [ pp_open_box;
+           eapply (evar "log_call") [evar Constants.fmt];
+           pp_close_box;
+           pp_space;
+           pp_char '=';
+           pp_space;
+           pp_open_box;
+           eapply
+             (pp_var_by_typ ~loc ~no_parentheses:true typ)
+             [evar Constants.fmt; evar res];
+           pp_close_box ]
+  in
+  let rec add_print ~loc fname params =
+    let open Builder (struct let loc = loc end) in
+    function
     | {pexp_desc = Pexp_fun (lbl, exp0, pat, expr); _} as pexp_fun ->
       let transform_pattern pat =
         match pat with
@@ -143,9 +153,25 @@ let transform_binding ~traversal ~loc vb =
       in
       let expr' = transform_pattern pat in
       {pexp_fun with pexp_desc = Pexp_fun (lbl, exp0, pat, expr')}
+    | {pexp_desc = Pexp_constraint (_, typ); _} as expr ->
+      let res = "result" in
+      let calc = "calculate_result" in
+      pexp_let Nonrecursive
+        [ value_binding ~pat:(pvar calc)
+            ~expr:(eabstract [punit] @@ traversal#expression expr);
+          value_binding ~pat:(pvar "log_call") ~expr:(print_call params fname)
+        ]
+      @@ pexp_let Nonrecursive
+           [ value_binding ~pat:punit ~expr:(log_cut_flush @@ evar "log_call");
+             value_binding ~pat:(pvar res) ~expr:(eapply (evar calc) [eunit]) ]
+      @@ pexp_let Nonrecursive
+           [ value_binding ~pat:punit
+               ~expr:(log_cut_flush @@ print_result ~res ~typ) ]
+           (evar res)
     | expr ->
-      Ast_builder.Default.pexp_let ~loc Nonrecursive
-        [print_call ~loc params fname]
+      pexp_let Nonrecursive
+        [ value_binding ~pat:punit
+            ~expr:(log_cut_flush @@ print_call params fname) ]
         (traversal#expression expr)
   in
   match vb.pvb_pat.ppat_desc with

@@ -1,5 +1,6 @@
 module type PpxLogCallsAux = sig
   val log : (Format.formatter -> unit) -> unit
+  val log_cut_flush : (Format.formatter -> unit) -> unit
   val const : string -> Format.formatter -> 'a -> unit
   val unsupported : string -> Format.formatter -> 'a -> unit
   val pp_open_box : Format.formatter -> unit
@@ -93,6 +94,7 @@ end
 module type S = sig
   module PpxLogCallsAux : PpxLogCallsAux
 
+  val pp_unit : Format.formatter -> unit -> unit
   val pp_bool : Format.formatter -> bool -> unit
   val pp_int : Format.formatter -> int -> unit
   val pp_float : Format.formatter -> float -> unit
@@ -111,6 +113,10 @@ module Make (C : Conf) = struct
     open Stdlib.Format
 
     let log = C.log
+
+    let log_cut_flush f =
+      C.log (fun fmt -> f fmt; pp_print_cut fmt (); pp_print_flush fmt ())
+
     let const str fmt _ = pp_print_string fmt str
     let unsupported str = const @@ "unsupported:" ^ str
     let pp_open_box fmt = pp_open_box fmt 2
@@ -179,6 +185,7 @@ module Make (C : Conf) = struct
   module PpxLogCallsStdTypes = struct
     open Format
 
+    let pp_unit fmt () = pp_print_string fmt "()"
     let pp_bool = pp_print_bool
     let pp_int = pp_print_int
     let pp_float = pp_print_float

@@ -5,13 +5,13 @@ type t = char [@@deriving show]
 
 module T = struct type i = int [@@deriving show] end
 
-let%log f ?s ~(i : T.i) (c : t c) (t2 : int * int) (_ : 'a) =
-  let%log h () = () in
-  h ();
-  ignore (i, c, s, ignore t2)
+let%log f ?s ~(i : T.i) (c : t c) (t2 : int * int) (_ : 'a) : int * int =
+  ignore (i, c, s);
+  t2
 
-and g ?(x : (int * int) option) (y : bool option option * int) = ignore (x, y)
+let%log g ?(x : (int * int) option) (y : bool option option * int) =
+  ignore (x, y)
 
 let () =
-  f ~s:"Y" ~i:2 ('b', 'c') (1, 2) 3;
+  ignore @@ f ~s:"Y" ~i:2 ('b', 'c') (1, 2) 3;
   g ~x:(1, 2) (Some (Some true), 3)

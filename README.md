@@ -24,6 +24,17 @@ f ?x:None true _
 
 Note that the value `"z"` is not printed since no explicit type is given for the parameter `z`.
 
+If you add a type annotation for the result like so:
+```
+let%log f ?(x : int option) (y : bool) z : unit = ignore (x, y, z)
+```
+
+Then in addition to the previous console output (before the execution of the
+function) the following output is displayed (after its execution):
+```
+f ?x:None true _ = ()
+```
+
 ## Usage ##
 
 When using dune it suffices to add the following stanzas to your project's `dune` file:
