@@ -114,6 +114,12 @@ module type S = sig
     Format.formatter ->
     'a option ->
     unit
+
+  val pp_list :
+     (Format.formatter -> 'a -> unit) ->
+    Format.formatter ->
+    'a list ->
+    unit
 end
 
 (** Example usage:

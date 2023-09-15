@@ -106,6 +106,12 @@ module type S = sig
     Format.formatter ->
     'a option ->
     unit
+
+  val pp_list :
+     (Format.formatter -> 'a -> unit) ->
+    Format.formatter ->
+    'a list ->
+    unit
 end
 
 module Make (C : Conf) = struct
@@ -195,6 +201,8 @@ module Make (C : Conf) = struct
     let pp_option pp fmt = function
       | None -> pp_print_string fmt "None"
       | Some x -> fprintf fmt "Some @[%a@]" pp x
+
+    let pp_list pp fmt l = pp_print_list pp fmt l
   end
 
   include PpxLogCallsStdTypes
